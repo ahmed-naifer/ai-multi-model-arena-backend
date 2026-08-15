@@ -1,9 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
 
-// Crée (ou ouvre si elle existe déjà) un fichier database.db
-const db = new DatabaseSync('database.db');
+const dbFile = process.env.DB_FILE || 'database.db';
+const db = new DatabaseSync(dbFile);
 
-// Table des utilisateurs
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -13,7 +12,6 @@ db.exec(`
   )
 `);
 
-// Table des comparaisons (liée à un utilisateur)
 db.exec(`
   CREATE TABLE IF NOT EXISTS comparisons (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -77,6 +77,10 @@ app.get('/api/history', requireAuth, (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-app.listen(PORT, () => {
-  console.log(`🚀 Serveur lancé sur http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`🚀 Serveur lancé sur http://localhost:${PORT}`);
+  });
+}
+
+export default app;
