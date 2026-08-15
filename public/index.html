@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Multi-Model Arena</title>
+  <style>
+    body { font-family: sans-serif; max-width: 1000px; margin: 40px auto; padding: 0 20px; }
+    textarea { width: 100%; height: 80px; font-size: 16px; padding: 10px; box-sizing: border-box; }
+    input { padding: 8px; font-size: 14px; margin-right: 8px; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 30px; }
+    .card { border: 1px solid #ccc; border-radius: 8px; padding: 15px; }
+    .card.ok { border-left: 4px solid green; }
+    .card.error { border-left: 4px solid red; }
+    .card h3 { margin-top: 0; }
+    #authBox, #appBox { margin-top: 20px; }
+    #appBox { display: none; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; }
+    .history-item { border: 1px solid #ddd; padding: 10px; margin-top: 10px; border-radius: 6px; cursor: pointer; }
+    .history-item:hover { background: #f5f5f5; }
+    .tabs { margin-top: 20px; }
+    .tabs button { background: #eee; border: 1px solid #ccc; }
+    .tabs button.active { background: #333; color: white; }
+  </style>
+</head>
+<body>
+  <h1>🤖 AI Multi-Model Arena</h1>
+
+  <!-- Zone visible uniquement si PAS connecté -->
+  <div id="authBox">
+    <h3 id="authTitle">Connexion</h3>
+    <input type="email" id="authEmail" placeholder="email@exemple.com">
+    <input type="password" id="authPassword" placeholder="mot de passe">
+    <button id="btnAuthSubmit">Se connecter</button>
+    <p><a href="#" id="toggleAuthMode">Pas de compte ? Inscris-toi</a></p>
+    <p id="authError" style="color: red;"></p>
+  </div>
+
+  <!-- Zone visible uniquement si connecté -->
+  <div id="appBox">
+    <div class="topbar">
+      <p>Connecté en tant que <strong id="userEmail"></strong></p>
+      <button id="btnLogout">Déconnexion</button>
+    </div>
+
+    <div class="tabs">
+      <button id="tabCompare" class="active">Comparer</button>
+      <button id="tabHistory">Mon historique</button>
+    </div>
+
+    <div id="compareView">
+      <textarea id="question" placeholder="Ta question ici..."></textarea>
+      <br>
+      <button id="btnCompare">Comparer</button>
+      <div class="grid" id="results"></div>
+    </div>
+
+    <div id="historyView" style="display: none;">
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <script>
+    let isRegisterMode = false;
+
+    // --- Gestion du token ---
+    function getToken() { return localStorage.getItem('token'); }
+    function setToken(token) { localStorage.setItem('token', token); }
+    function clearToken() { localStorage.removeItem('token'); }
+
+    function updateUI() {
+      const token = getToken();
+      document.getElementById('authBox').style.display = token ? 'none' : 'block';
+      document.getElementById('appBox').style.display = token ? 'block' : 'none';
+      if (token) {
+        const email = localStorage.getItem('userEmail') || '';
+        document.getElementById('userEmail').textContent = email;
+      }
+    }
+
+    // --- Inscription / Connexion ---
+    document.getElementById('toggleAuthMode').addEventListener('click', (e) => {
+      e.preventDefault();
+      isRegisterMode = !isRegisterMode;
+      document.getElementById('authTitle').textContent = isRegisterMode ? 'Inscription' : 'Connexion';
+      document.getElementById('btnAuthSubmit').textContent = isRegisterMode ? "S'inscrire" : 'Se connecter';
+      e.target.textContent = isRegisterMode ? 'Déjà un compte ? Connecte-toi' : "Pas de compte ? Inscris-toi";
+    });
+
+    document.getElementById('btnAuthSubmit').addEventListener('click', async () => {
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value;
+      const errorEl = document.getElementById('authError');
+      errorEl.textContent = '';
+
+      if (!email || !password) {
+        errorEl.textContent = 'Remplis email et mot de passe.';
+        return;
+      }
+
+      const endpoint = isRegisterMode ? '/api/register' : '/api/login';
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          errorEl.textContent = data.error || 'Une erreur est survenue.';
+          return;
+        }
+
+        if (isRegisterMode) {
+          // Après inscription réussie, on bascule automatiquement en mode login
+          isRegisterMode = false;
+          document.getElementById('authTitle').textContent = 'Connexion';
+          document.getElementById('btnAuthSubmit').textContent = 'Se connecter';
+          errorEl.style.color = 'green';
+          errorEl.textContent = 'Compte créé ! Connecte-toi maintenant.';
+        } else {
+          setToken(data.token);
+          localStorage.setItem('userEmail', data.user.email);
+          updateUI();
+        }
+      } catch (err) {
+        errorEl.textContent = 'Erreur réseau : ' + err.message;
+      }
+    });
+
+    document.getElementById('btnLogout').addEventListener('click', () => {
+      clearToken();
+      localStorage.removeItem('userEmail');
+      updateUI();
+    });
+
+    // --- Onglets Comparer / Historique ---
+    document.getElementById('tabCompare').addEventListener('click', () => {
+      document.getElementById('tabCompare').classList.add('active');
+      document.getElementById('tabHistory').classList.remove('active');
+      document.getElementById('compareView').style.display = 'block';
+      document.getElementById('historyView').style.display = 'none';
+    });
+
+    document.getElementById('tabHistory').addEventListener('click', async () => {
+      document.getElementById('tabHistory').classList.add('active');
+      document.getElementById('tabCompare').classList.remove('active');
+      document.getElementById('compareView').style.display = 'none';
+      document.getElementById('historyView').style.display = 'block';
+      await loadHistory();
+    });
+
+    async function loadHistory() {
+      const listEl = document.getElementById('historyList');
+      listEl.innerHTML = '<p>⏳ Chargement...</p>';
+
+      const response = await fetch('/api/history', {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const historique = await response.json();
+
+      if (historique.length === 0) {
+        listEl.innerHTML = '<p>Aucune comparaison pour l\'instant.</p>';
+        return;
+      }
+
+      listEl.innerHTML = historique.map(h => `
+        <div class="history-item">
+          <strong>${h.question}</strong>
+          <p style="color: #666; font-size: 13px;">${h.date}</p>
+        </div>
+      `).join('');
+    }
+
+    // --- Comparaison (route protégée) ---
+    document.getElementById('btnCompare').addEventListener('click', async () => {
+      const question = document.getElementById('question').value.trim();
+      if (!question) return;
+
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = '<p>⏳ Interrogation des modèles...</p>';
+
+      const response = await fetch('/api/compare', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({ question }),
+      });
+
+      if (response.status === 401) {
+        clearToken();
+        updateUI();
+        return;
+      }
+
+      const data = await response.json();
+
+      resultsDiv.innerHTML = data.resultats.map(r => `
+        <div class="card ${r.ok ? 'ok' : 'error'}">
+          <h3>${r.model}</h3>
+          <p>${r.ok ? r.reponse : '❌ ' + r.erreur}</p>
+        </div>
+      `).join('') + `
+        <div class="card" style="grid-column: 1 / -1; background: #f5f5f5; border-left: 4px solid #6b46c1;">
+          <h3>⚖️ Verdict du juge (Gemini)</h3>
+          <p>${data.verdict}</p>
+        </div>
+      `;
+    });
+
+    // Initialisation au chargement de la page
+    updateUI();
+  </script>
+</body>
+</html>
