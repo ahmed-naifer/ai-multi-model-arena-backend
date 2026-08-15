@@ -1,11 +1,13 @@
 import express from 'express';
 import db from './database.js';
 import { requireAuth } from './middleware.js';
+import cors from 'cors';
 
 import { registerUser, loginUser } from './auth.js';
 import { askAllModels, judgeResponses } from './models.js';
 const app = express();
-const PORT = 4000;
+app.use(cors());
+const PORT = process.env.PORT || 4000;
 
 app.use(express.json());          // pour lire le JSON envoyé par le frontend
 app.use(express.static('public')); // pour servir le fichier index.html
